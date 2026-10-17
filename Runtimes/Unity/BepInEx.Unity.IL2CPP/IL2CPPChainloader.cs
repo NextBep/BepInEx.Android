@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -82,7 +83,7 @@ public class IL2CPPChainloader : BaseChainloader<BasePlugin>
             return;
         }
 
-        var runtimeInvokePtr = NativeLibrary.GetExport(il2CppHandle, "il2cpp_runtime_invoke");
+        var runtimeInvokePtr = NativeLibrary.GetExport(il2CppHandle, NextInterop.GetIl2CppApi("il2cpp_runtime_invoke"));
         runtimeInvokePtr = XrefScannerLowLevel.JumpTargets(runtimeInvokePtr).First();
 
         PreloaderLogger.Log.Log(LogLevel.Debug, $"Runtime invoke pointer: 0x{runtimeInvokePtr.ToInt64():X}");
@@ -92,6 +93,7 @@ public class IL2CPPChainloader : BaseChainloader<BasePlugin>
         originalInvoke = RuntimeInvokeDetour.GenerateTrampoline<RuntimeInvokeDetourDelegate>();
 
         PreloaderLogger.Log.Log(LogLevel.Debug, "Runtime invoke patched");
+        NextInterop.set_loader_message("Initialized Chainloader...");
     }
 
     private static IntPtr OnInvokeMethod(IntPtr method, IntPtr obj, IntPtr parameters, IntPtr exc)
@@ -101,8 +103,12 @@ public class IL2CPPChainloader : BaseChainloader<BasePlugin>
         var unhook = false;
 
         if (methodName == "Internal_ActiveSceneChanged")
+        {
             try
             {
+                NextInterop.set_loader_stage(NextInterop.LoaderStage.Chainloader);
+                NextInterop.set_loader_message("Running Chainloader...");
+
                 if (ConfigUnityLogging.Value)
                 {
                     Logger.Sources.Add(new IL2CPPUnityLogSource());
@@ -122,6 +128,11 @@ public class IL2CPPChainloader : BaseChainloader<BasePlugin>
                 Logger.Log(LogLevel.Fatal, "Unable to execute IL2CPP chainloader");
                 Logger.Log(LogLevel.Error, ex);
             }
+            finally
+            {
+                NextInterop.set_loader_stage(NextInterop.LoaderStage.Finished);
+            }
+        }
 
         var result = originalInvoke(method, obj, parameters, exc);
 
@@ -135,6 +146,18 @@ public class IL2CPPChainloader : BaseChainloader<BasePlugin>
         return result;
     }
 
+    protected override IList<PluginInfo> DiscoverPlugins()
+    {
+        var plugins = DiscoverPluginsFrom(Paths.PluginPath).ToList();
+        foreach (var pluginPath in NextCoreEntrypoint.AuxiliaryPluginFolders)
+        {
+            Logger.Log(LogLevel.Info, "Loading auxiliary plugin path " + pluginPath);
+            plugins.AddRange(DiscoverPluginsFrom(pluginPath));
+        }
+
+        return plugins;
+    }
+
     protected override void InitializeLoggers()
     {
         base.InitializeLoggers();
@@ -146,6 +169,7 @@ public class IL2CPPChainloader : BaseChainloader<BasePlugin>
 
     public override BasePlugin LoadPlugin(PluginInfo pluginInfo, Assembly pluginAssembly)
     {
+        NextInterop.set_loader_message($"Loading {pluginInfo.Metadata.Name}");
         var type = pluginAssembly.GetType(pluginInfo.TypeName);
 
         var pluginInstance = (BasePlugin) Activator.CreateInstance(type);

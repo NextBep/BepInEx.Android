@@ -289,3 +289,6 @@ __pycache__/
 
 # Cake binaries
 tools/
+
+# Android distribution staging (pack-android.ps1)
+**/android-package/

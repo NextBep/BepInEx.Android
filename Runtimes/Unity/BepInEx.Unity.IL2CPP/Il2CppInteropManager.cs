@@ -73,7 +73,7 @@ internal static partial class Il2CppInteropManager
 
     private static readonly ConfigEntry<bool> ScanMethodRefs = ConfigFile.CoreConfig.Bind(
      "IL2CPP", "ScanMethodRefs",
-     Environment.Is64BitProcess,
+     false,
      "If enabled, Il2CppInterop will use xref to find dead methods and generate CallerCount attributes.");
 
     private static readonly ConfigEntry<bool> DumpDummyAssemblies = ConfigFile.CoreConfig.Bind(
@@ -102,7 +102,7 @@ internal static partial class Il2CppInteropManager
     private static readonly ConfigEntry<string> GlobalMetadataPath = ConfigFile.CoreConfig.Bind(
      "IL2CPP", "GlobalMetadataPath",
      "{GameDataPath}/Managed/Metadata/global-metadata.dat",
-     // 这会他妈有问题吧。
+     // Android Unity games ship the metadata under bin/Data/Managed/Metadata, not il2cpp/Metadata.
      new StringBuilder()
          .AppendLine("The path to the IL2CPP metadata file.")
          .AppendLine("Supports the following placeholders:")
@@ -227,6 +227,8 @@ internal static partial class Il2CppInteropManager
 
         try
         {
+            Logger.LogInfo($"Low Memory Mode: {NextInterop.LowMemoryMode}");
+
             Directory.CreateDirectory(IL2CPPInteropAssemblyPath);
             Directory.EnumerateFiles(IL2CPPInteropAssemblyPath, "*.dll").Do(File.Delete);
 
@@ -253,6 +255,7 @@ internal static partial class Il2CppInteropManager
     }
 
     private static void DownloadUnityAssemblies() {
+        NextInterop.set_loader_message("Downloading Unity assemblies...");
         var unityVersion = UnityInfo.Version;
         var version = $"{unityVersion.Major}.{unityVersion.Minor}.{unityVersion.Build}";
         var source = UnityBaseLibrariesSource.Value.Replace("{VERSION}", version);
@@ -311,6 +314,7 @@ internal static partial class Il2CppInteropManager
 
     private static List<AsmResolver.DotNet.AssemblyDefinition> RunCpp2Il()
     {
+        NextInterop.set_loader_message("Running Cpp2IL...");
         var metadataPath = Path.Combine(Paths.GameRootPath,
                                         GlobalMetadataPath.Value
                                                           .Replace("{BepInEx}", Paths.BepInExRootPath)
@@ -334,6 +338,10 @@ internal static partial class Il2CppInteropManager
             cpp2IlLogger.LogError($"[{s}] {message.Trim()}");
 
         var unityVersion = UnityInfo.Version;
+
+        Cpp2IlApi.RuntimeOptions ??= new Cpp2IlRuntimeArgs();
+        Cpp2IlApi.RuntimeOptions.LowMemoryMode = NextInterop.LowMemoryMode;
+
         Cpp2IlApi.InitializeLibCpp2Il(GameAssemblyPath, metadataPath, unityVersion, false);
 
         List<Cpp2IlProcessingLayer> processingLayers = new() { new AttributeInjectorProcessingLayer(), };
@@ -361,6 +369,7 @@ internal static partial class Il2CppInteropManager
 
     private static void RunIl2CppInteropGenerator(List<AsmResolver.DotNet.AssemblyDefinition> sourceAssemblies)
     {
+        NextInterop.set_loader_message("Generating IL2CPP Interop files...");
         var opts = new GeneratorOptions
         {
             GameAssemblyPath = ScanMethodRefs.Value ? GameAssemblyPath : null,
@@ -370,6 +379,8 @@ internal static partial class Il2CppInteropManager
             ObfuscatedNamesRegex = !string.IsNullOrEmpty(ConfigUnhollowerDeobfuscationRegex.Value)
                                        ? new Regex(ConfigUnhollowerDeobfuscationRegex.Value)
                                        : null,
+            NoXrefCache = true,
+            Parallel = !NextInterop.LowMemoryMode
         };
 
         if (File.Exists(RenameMapPath))

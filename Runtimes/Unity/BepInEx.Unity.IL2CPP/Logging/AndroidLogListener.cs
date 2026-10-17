@@ -10,7 +10,7 @@ public class AndroidLogListener : ILogListener
 {
     protected static readonly ConfigEntry<LogLevel> ConfigConsoleDisplayedLevel = ConfigFile.CoreConfig.Bind(
      "Logging.Console", "LogLevels",
-     LogLevel.Fatal | LogLevel.Error | LogLevel.Warning | LogLevel.Message | LogLevel.Info | LogLevel.Debug,
+     LogLevel.Fatal | LogLevel.Error | LogLevel.Warning | LogLevel.Message | LogLevel.Info,
      "Only displays the specified log levels in the console output.");
 
     public LogLevel LogLevelFilter => ConfigConsoleDisplayedLevel.Value;

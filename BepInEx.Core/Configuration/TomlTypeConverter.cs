@@ -31,6 +31,11 @@ public static class TomlTypeConverter
             ConvertToString = (obj, type) => obj.ToString().ToLowerInvariant(),
             ConvertToObject = (str, type) => bool.Parse(str)
         },
+        [typeof(byte)] = new TypeConverter
+        {
+            ConvertToString = (obj, type) => obj.ToString(),
+            ConvertToObject = (str, type) => byte.Parse(str)
+        },
 
         //integral types
 

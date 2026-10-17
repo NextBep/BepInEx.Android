@@ -10,6 +10,8 @@ internal static class UnityPreloaderRunner
 {
     public static void PreloaderMain()
     {
+        NextInterop.set_loader_stage(NextInterop.LoaderStage.Preloader);
+        NextInterop.set_loader_message("Running Preloader...");
         PlatformUtils.SetPlatform();
 
         Paths.SetExecutablePath(EnvVars.NEXT_GAME_BINARY,
