@@ -110,12 +110,22 @@ public class IL2CPPChainloader : BaseChainloader<BasePlugin>
                 NextInterop.set_loader_message("Running Chainloader...");
 
                 if (ConfigUnityLogging.Value)
-                {
-                    Logger.Sources.Add(new IL2CPPUnityLogSource());
+                    try
+                    {
+                        Logger.Sources.Add(new IL2CPPUnityLogSource());
 
-                    Application.CallLogCallback("Test call after applying unity logging hook", "", LogType.Assert,
-                                                true);
-                }
+                        Application.CallLogCallback("Test call after applying unity logging hook", "", LogType.Assert,
+                                                    true);
+                    }
+                    catch (Exception ex)
+                    {
+                        // Enabling Unity log forwarding requires the UnityEngine.Application::SetLogCallbackDefined
+                        // ICall. Game builds stripped of it (or builds that never use Unity's log callback) cannot
+                        // enable it, so degrade gracefully instead of failing the whole chainloader.
+                        Logger.Log(LogLevel.Warning,
+                                   "Unable to enable Unity log listening; Unity log messages will not be forwarded to BepInEx logs for this game");
+                        Logger.Log(LogLevel.Debug, ex);
+                    }
 
                 unhook = true;
 
