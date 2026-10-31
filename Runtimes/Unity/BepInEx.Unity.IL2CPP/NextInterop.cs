@@ -5,7 +5,7 @@ namespace BepInEx.Unity.IL2CPP;
 
 internal static partial class NextInterop
 {
-    private const string LIBRARY_NAME = "fusion";
+    private const string LIBRARY_NAME = "nextbep";
 
     public static bool LowMemoryMode => get_low_memory_mode() == 1;
 
